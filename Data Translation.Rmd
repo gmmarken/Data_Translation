@@ -1,0 +1,43 @@
+---
+title: "Data Translation"
+author: "Kalahan Hughes"
+date: "3/6/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r cars}
+library(tidyverse)
+library(vtable)
+library(lubridate)
+library(fixest)
+library(jtools)
+library(car)
+library(lmtest)
+library(ggpubr)
+library(effects)
+library(haven)
+
+rawdata <- read_dta("./cps_00005.dta/cps_00005.dta")
+indnamelink <- read_csv("./indnames.csv")
+rawlinkedup <- rawdata %>% left_join(indnamelink, by = "ind")
+##covidunaw: 01= No 02 = Yes
+## employment status: 01 Armed forces, 10 = At work, 12 = has job not work last week, 21 = Unemployed experienced worker, 22 = unemployed new worker, 30-36 Not in labor force
+## Sex = 1 Male, 2 = Female
+## Race: 100 = White, 200 = Black, 300= American Indian, 650 = Asian/Pacific Islander(651 Asian Only 652 Pacific Islander Only). Discussion about multi race
+#marst: 1 = married spouse present, 2 = married spouse absent, 3 = separated, 4 = divorced, 5 = widowed, 6 = single
+
+
+## creating year month column
+rawlinkedup <- rawlinkedup %>% mutate(yearmonth = make_date(year = rawlinkedup$year, month = rawlinkedup$month))
+## after covid variable
+fulldata <- rawlinkedup %>% mutate(aftercovid = ifelse(yearmonth > as_date("2020-03-01"),1,0))
+
+```
+
