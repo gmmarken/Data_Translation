@@ -1,0 +1,110 @@
+---
+title: "Data_Trasnlation"
+author: "Gabriel Marken"
+date: "3/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(tidyverse)
+library(vtable)
+library(lubridate)
+library(fixest)
+library(jtools)
+library(car)
+library(lmtest)
+library(ggpubr)
+library(effects)
+library(haven)
+library(dplyr)
+```
+
+```{r}
+rawdata <- read_dta("./data/cps_00005.dta")
+indnamelink <- read_csv("./data/indnames.csv")
+rawlinkedup <- rawdata %>% left_join(indnamelink, by = "ind")
+```
+
+```{r}
+##covidunaw: 01= No 02 = Yes
+## employment status: 01 Armed forces, 10 = At work, 12 = has job not work last week, 21 = Unemployed experienced worker, 22 = unemployed new worker, 30-36 Not in labor force
+## Sex = 1 Male, 2 = Female
+## Race: 100 = White, 200 = Black, 300= American Indian, 650 = Asian/Pacific Islander(651 Asian Only 652 Pacific Islander Only). Discussion about multi race
+#marst: 1 = married spouse present, 2 = married spouse absent, 3 = separated, 4 = divorced, 5 = widowed, 6 = single
+## creating year month column
+rawlinkedup <- rawlinkedup %>% mutate(yearmonth = make_date(year = rawlinkedup$year, month = rawlinkedup$month))
+## after covid variable
+fulldata <- rawlinkedup %>% mutate(aftercovid = ifelse(yearmonth > as_date("2020-03-01"),1,0))
+
+fulldata <- fulldata %>% mutate(working = ifelse(empstat == 10,1,0))
+
+fulldata <- fulldata %>%
+   mutate(retail = indname == 'Retail Trade')
+
+fulldata <- fulldata %>%
+   mutate(male = sex == 1)
+```
+
+
+
+```{r}
+# 
+fulldata <- fulldata %>% mutate(earnweek = ifelse(earnweek > 9999, NA_real_, earnweek))
+```
+
+```{r}
+# tells us our interaction term is possible
+table(fulldata$aftercovid, fulldata$retail)
+```
+
+```{r}
+# modeling questions 1 and 2
+model1 <- fulldata %>%
+  feols(working ~ aftercovid:retail|yearmonth)
+
+model2 <- lm(working ~ aftercovid*retail, data = fulldata)
+```
+
+```{r}
+# Question 1 and 2 holy grail
+export_summs(model1, model2, digits = 8)
+```
+
+```{r}
+# Question 3
+# Employment data before and after covid and by age/sex
+model3 <- lm(working ~ aftercovid*retail + age, data = fulldata)
+model4 <- lm(working ~ aftercovid*retail + male, data = fulldata)
+model5 <- lm(working ~ aftercovid*retail + age + male, data = fulldata)
+export_summs(model2, model3, model4, model5, digits = 8)
+```
+
+```{r}
+# Question 3 
+# earnings impacted by sex or age
+model6 <- lm(earnweek ~ aftercovid*age, data = fulldata)
+model7 <- lm(earnweek ~ aftercovid*male, data = fulldata)
+export_summs(model6, model7, digits = 8)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
