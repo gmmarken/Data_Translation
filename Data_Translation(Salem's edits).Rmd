@@ -1,0 +1,189 @@
+---
+title: "Data Translation Project"
+author: "Group 7"
+date: "Sys.Date()"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r cars}
+library(tidyverse)
+library(vtable)
+library(lubridate)
+library(fixest)
+library(jtools)
+library(car)
+library(lmtest)
+library(ggpubr)
+library(effects)
+library(haven)
+```
+
+
+```{r}
+rawdata <- read_dta("./cps_00005.dta")
+indnamelink <- read_csv("./indnames.csv")
+rawlinkedup <- rawdata %>% left_join(indnamelink, by = "ind")
+
+#covidunaw (Unable to work due to Covid): No = 1, Yes = 2
+
+#Employment status: Armed forces = 1 , At work = 10, has job not work last week = 12, Unemployed experienced worker = 21, unemployed new worker = 22, Not in labor force = 30-36 
+
+#Sex: Male = 1, Female = 2
+
+#Race: White = 100, Black = 200, American Indian = 300, Asian/Pacific Islander (651 Asian Only 652 Pacific Islander Only) = 650. Discussion about multi race
+
+#marst (marital status): married spouse present = 1, married spouse absent = 2, separated = 3, divorced = 4, widowed = 5, single = 6
+```
+
+
+```{r}
+## creating year month column
+rawlinkedup <- rawlinkedup %>% mutate(yearmonth = make_date(year = rawlinkedup$year, month = rawlinkedup$month))
+
+## after Covid variable
+fulldata <- rawlinkedup %>% mutate(aftercovid = ifelse(yearmonth > as_date("2020-03-01"),1,0))
+
+fulldata <- fulldata %>% mutate(working = ifelse(empstat == 10,1,0))
+
+fulldata <- fulldata %>%
+   mutate(retail = indname == 'Retail Trade')
+
+fulldata <- fulldata %>%
+   mutate(male = sex == 1)
+
+#niu changed to na
+fulldata <- fulldata %>% mutate(earnweek = ifelse(earnweek > 9999, NA_real_, earnweek))
+
+fulldata <- fulldata %>% mutate(marst = ifelse(marst > 8, NA_real_, marst))
+
+fulldata <- fulldata %>% mutate(race = ifelse(race > 831, NA_real_, race))
+
+fulldata <- fulldata %>% mutate(covidunaw = ifelse(covidunaw > 98, NA_real_, covidunaw))
+
+fulldata <- fulldata %>% mutate(covidlook = ifelse(covidlook > 98, NA_real_, covidlook))
+```
+
+
+```{r}
+# modeling questions 1 and 2
+model1 <- fulldata %>%
+  feols(working ~ aftercovid:retail|yearmonth)
+
+model2 <- lm(working ~ aftercovid*retail, data = fulldata)
+
+# Question 1 and 2 holy grail
+export_summs(model1, model2, digits = 8, model.names = c("feols on working controlling for variation within time","lm on working with aftercovid*retail"))
+
+#Question 3
+# Employment data before and after Covid and by age/sex
+model3 <- lm(working ~ aftercovid*retail + age, data = fulldata)
+model4 <- lm(working ~ aftercovid*retail + male, data = fulldata)
+model5 <- lm(working ~ aftercovid*retail + age + male, data = fulldata)
+export_summs(model2, model3, model4, model5, digits = 8, model.names = c("lm on working with aftercovid*retail","lm on working aftercovid*retail control for age","lm on working aftercovid*retail control for sex","lm on working aftercovid*retail control for age and sex"))
+
+# Question 3 
+# earnings impacted by sex or age
+model6 <- lm(earnweek ~ aftercovid*age, data = fulldata)
+model7 <- lm(earnweek ~ aftercovid*male, data = fulldata)
+export_summs(model6, model7, digits = 8, model.names = c("lm on earnweek with aftercovid*age","lm on earnweek with aftercovid*male"))
+```
+
+
+```{r}
+#bp test and hypothesis test
+bptest(model1)
+bptest(model2)
+bptest(model3)
+bptest(model4)
+bptest(model5)
+bptest(model6)
+bptest(model7)
+
+#p value here is far below 0.05 (0.00000000000000022) so we reject the null which for the Breusch-Pagan test which is that variance of the residuals is constant. Heteroscedasticity is present so we need robust standard errors.
+
+linearHypothesis(model2,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0"))
+
+linearHypothesis(model3,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0","age=0"))
+
+linearHypothesis(model4,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0","maleTRUE=0"))
+
+linearHypothesis(model5,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0","age=0","maleTRUE=0"))
+
+linearHypothesis(model6,c("aftercovid=0","age=0","aftercovid:age=0"))
+
+linearHypothesis(model7,c("aftercovid=0","maleTRUE=0","aftercovid:maleTRUE=0"))
+
+# we can reject the null so statistically significant
+```
+
+
+```{r}
+#results export summs adjust if needed
+export_summs(model1, model2, digits = 8, model.names = c("feols on working controlling for variation withing time","lm on working with aftercovid*retail"), robust = TRUE, error_format = "[{conf.low}, {conf.high}], ({std.error})")
+
+export_summs(model2, model3, model4, model5, digits = 8, model.names = c("lm on working with aftercovid*retail","lm on working aftercovid*retail control for age","lm on working aftercovid*retail control for sex","lm on working aftercovid*retail control for age and sex"), robust = TRUE, error_format = "[{conf.low}, {conf.high}], ({std.error})")
+
+export_summs(model6, model7, digits = 8, model.names = c("lm on earnweek with aftercovid*age","lm on earnweek with aftercovid*male"), robust = TRUE, error_format = "[{conf.low}, {conf.high}], ({std.error})")
+```
+
+
+```{r}
+##plotting effect terms
+
+#model2
+model2effect <- effect('aftercovid*retail',model2,se= TRUE)
+plot(model2effect,multiline = TRUE)
+
+##effects (on working binary so a little wonky)
+#model3effect <- effect('aftercovid*retail',model3,se= TRUE) doesnt work for some reason
+#plot(model3effect,multiline = TRUE)
+
+#model4
+model4effect <- effect('aftercovid*retail',model4,se= TRUE)
+plot(model4effect,multiline = TRUE)
+
+#model5effect <- effect('aftercovid*retail',model5,se= TRUE) same reason plot disabled
+#plot(model5effect,multiline = TRUE)
+
+#effects (earnings should translate better)
+
+#model6effect <- effect('aftercovid*age',model6) Error in mod.matrix[, components] : subscript out of bounds (This was resolved: see the last code chunk)
+#plot(model6effect,multiline = TRUE)
+
+#model7
+model7effect <- effect('aftercovid*male',model7,se= TRUE)
+plot(model7effect,multiline = TRUE)
+
+## plot cI please
+```
+
+
+```{r}
+
+#Salem:
+
+#Effect is not working for model 6 because age is not a binary variable like the other variables we have
+
+#I think what we can do to make it a binary variable is to use the age 41 as a cutoff for young vs. old workers (i.e., age > 41 old workers, age =< 41 young workers). I'm using 41 because if you're 41 or younger, then you're a millennial or Gen Z, which both are groups of young people. The earning patterns between young and old workers differ, so we'd like to see how Covid affected the earnings of young people vs old people.
+
+fulldata <- fulldata %>% mutate(young = age <= 41)
+
+model6 <- lm(earnweek ~ aftercovid*young, data = fulldata)
+
+bptest(model6)
+
+linearHypothesis(model6, c("aftercovid=0","youngTRUE=0","aftercovid:youngTRUE=0"))
+
+model6effect <- effect('aftercovid*young', model6, se= TRUE)
+
+plot(model6effect, multiline = TRUE)
+
+#And it works! This graph shows earnings by age before and after Covid.
+```
+
