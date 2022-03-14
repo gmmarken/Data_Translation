@@ -46,6 +46,7 @@ fulldata <- fulldata %>%
    mutate(retail = indname == 'Retail Trade')
 fulldata <- fulldata %>%
    mutate(male = sex == 1)
+fulldata <- fulldata %>% mutate(young = age <= 41)
 #niu changed to na
 fulldata <- fulldata %>% mutate(earnweek = ifelse(earnweek > 9999, NA_real_, earnweek))
 
@@ -56,30 +57,31 @@ fulldata <- fulldata %>% mutate(race = ifelse(race > 831, NA_real_, race))
 fulldata <- fulldata %>% mutate(covidunaw = ifelse(covidunaw > 98, NA_real_, covidunaw))
 
 fulldata <- fulldata %>% mutate(covidlook = ifelse(covidlook > 98, NA_real_, covidlook))
-
 ```
 ```{r}
 # modeling questions 1 and 2
 model1 <- fulldata %>%
   feols(working ~ aftercovid:retail|yearmonth)
 model2 <- lm(working ~ aftercovid*retail, data = fulldata)
+
 # Question 1 and 2 holy grail
 export_summs(model1, model2, digits = 8, model.names = c("feols on working controlling for variation withing time","lm on working with aftercovid*retail"))
+
 #Question 3
 # Employment data before and after covid and by age/sex
 model3 <- lm(working ~ aftercovid*retail + age, data = fulldata)
 model4 <- lm(working ~ aftercovid*retail + male, data = fulldata)
 model5 <- lm(working ~ aftercovid*retail + age + male, data = fulldata)
-export_summs(model2, model3, model4, model5, digits = 8, model.names = c("lm on working with aftercovid*retail","lm on working aftercovid*retail control for age","lm on working aftercovid*retail control for sex","lm on working aftercovid*retail control for age and sex"))
-
 
 # Question 3 
 # earnings impacted by sex or age
 model6 <- lm(earnweek ~ aftercovid*age, data = fulldata)
+model6youngbinary <- lm(earnweek ~ aftercovid*young, data = fulldata)
 model7 <- lm(earnweek ~ aftercovid*male, data = fulldata)
-export_summs(model6, model7, digits = 8, model.names = c("lm on earnweek with aftercovid*age","lm on earnweek with aftercovid*male"))
-
 ```
+
+
+
 
 
 ```{r}
@@ -90,51 +92,61 @@ bptest(model3)
 bptest(model4)
 bptest(model5)
 bptest(model6)
+bptest(model6youngbinary)
 bptest(model7)
 
 #p value here is far below 0.05 (0.00000000000000022) so we reject the null which for the Breusch-Pagan test which is that variance of the residuals is constant. Heteroscedasticity is present so we need robust standard errors.
 
 linearHypothesis(model2,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0"))
+
 linearHypothesis(model3,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0","age=0"))
+
 linearHypothesis(model4,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0","maleTRUE=0"))
+
 linearHypothesis(model5,c("aftercovid=0","retailTRUE=0","aftercovid:retailTRUE=0","age=0","maleTRUE=0"))
+
 linearHypothesis(model6,c("aftercovid=0","age=0","aftercovid:age=0"))
+
+linearHypothesis(model6youngbinary, c("aftercovid=0","youngTRUE=0","aftercovid:youngTRUE=0"))
+
 linearHypothesis(model7,c("aftercovid=0","maleTRUE=0","aftercovid:maleTRUE=0"))
-# we can reject the null so statistically sig
+
+# we can reject the null so statistically significant
 
 ```
 
 ```{r}
-#results export summs adjust if needed
+#Heteroscedasticity is present so we need robust standard errors. Export_summs with robust standard errors
 export_summs(model1, model2, digits = 8, model.names = c("feols on working controlling for variation withing time","lm on working with aftercovid*retail"), robust = TRUE,error_format = "[{conf.low}, {conf.high}], ({std.error})")
 
 export_summs(model2, model3, model4, model5, digits = 8, model.names = c("lm on working with aftercovid*retail","lm on working aftercovid*retail control for age","lm on working aftercovid*retail control for sex","lm on working aftercovid*retail control for age and sex"),robust = TRUE,error_format = "[{conf.low}, {conf.high}], ({std.error})")
 
-export_summs(model6, model7, digits = 8, model.names = c("lm on earnweek with aftercovid*age","lm on earnweek with aftercovid*male"),robust = TRUE,error_format = "[{conf.low}, {conf.high}], ({std.error})")
+export_summs(model6, model6youngbinary, model7, digits = 8, model.names = c("lm on earnweek with aftercovid*age","lm on earnweek with aftercovid*young","lm on earnweek with aftercovid*male"),robust = TRUE,error_format = "[{conf.low}, {conf.high}], ({std.error})")
 
 ```
+
 
 ```{r}
 ##plotting effect term
-#model2
+
 model2effect <- effect('aftercovid*retail',model2,se= TRUE)
 plot(model2effect,multiline = TRUE)
-##effects (on working binary so a little wonky)
-#model3effect <- effect('aftercovid*retail',model3,se= TRUE) doesnt work for some reason
 model4effect <- effect('aftercovid*retail',model4,se= TRUE)
-#model5effect <- effect('aftercovid*retail',model5,se= TRUE) same reason plot disabled
-#plot(model3effect,multiline = TRUE)
 plot(model4effect,multiline = TRUE)
-#plot(model5effect,multiline = TRUE)
-#effects (earnings should translate better)
-
-#model6effect <- effect('aftercovid*age',model6) Error in mod.matrix[, components] : subscript out of bounds
-
+model6youngbinaryeffect <- effect('aftercovid*young', model6youngbinary, se= TRUE)
+plot(model6youngbinaryeffect, multiline = TRUE)
 model7effect <- effect('aftercovid*male',model7,se= TRUE)
-#plot(model6effect,multiline = TRUE)
 plot(model7effect,multiline = TRUE)
-
-## plot cI please
-
+```
+```{r}
+## plot cI
+plot_coefs(model2, scales = "fixed",level = 0.025) + coord_flip()
+plot_coefs(model3, scales = "fixed",level = 0.025) + coord_flip()
+plot_coefs(model4, scales = "fixed",level = 0.025) + coord_flip()
+plot_coefs(model5, scales = "fixed",level = 0.025) + coord_flip()
+plot_coefs(model6, scales = "fixed",level = 0.025) + coord_flip()
+plot_coefs(model6youngbinary, scales = "fixed",level = 0.025) + coord_flip()
+plot_coefs(model7, scales = "fixed",level = 0.025) + coord_flip()
 
 ```
+
