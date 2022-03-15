@@ -74,7 +74,7 @@ fulldata <- fulldata %>% mutate(covidlook = ifelse(covidlook > 98, NA_real_, cov
 
 The above code is used to manipulate the data set in order to create variables for the models we'll build. Specifically, we created a "yearmonth" variable to assign a time for each observation in a year-month format. We also use "mutate" to create a number of variables that we plan to use in our regression models in order to explain changes in employment and earnings before and after Covid.
 
-We'd like to note that we turned the variable "age" into a binary variable (called *young*)to make it easier to work with in our models. We use the age 41 as a cutoff for young vs. old workers (i.e., age > 41 old workers, age =< 41 young workers). The assumption here is that if a worker is 41 or younger, then they are a millennial or Gen Z, which can both be considered groups of young people. The earning patterns between young and old workers differ, so in our models, we'd like to see how Covid affected the earnings of young people vs old people.
+We'd like to note that we turned the variable "age" into a binary variable (called *young*) to make it easier to work with in our models. We use the age 41 as a cutoff for young vs. old workers (i.e., age > 41 old workers, age =< 41 young workers). The assumption here is that if a worker is 41 or younger, then they are a millennial or Gen Z, which can both be considered groups of young people. The earning patterns between young and old workers differ, so in our models, we'd like to see how Covid affected the earnings of young people vs old people.
 
 
 ```{r}
@@ -86,7 +86,7 @@ export_summs(model1, model2, digits = 8, model.names = c("feols on working contr
 ```
 
 
-The above code shows model 1, which is a fixed effects model showing employment trends while controlling for variation within time, and model 2, a multivariate regression model showing the difference in employment trends before and after Covid, as well as in the retail industry. The results of the regression models are shown in the table above. 
+The above code shows model 1, which is a fixed effects model showing employment trends while controlling for variation within time, and model 2, a multivariate regression model showing the difference in employment trends before and after Covid in the retail industry. The results of the regression models are shown in the table above. 
 
 
 ```{r}
@@ -106,11 +106,11 @@ export_summs(model6, model7, digits = 8, model.names = c("lm on earnweek with af
 ```
 
 
-Model 3: a multivariate regression model showing the difference in employment trends before and after Covid, as well as in the retail industry controlling for age. 
+Model 3: a multivariate regression model showing the difference in employment trends before and after Covid in the retail industry controlling for age. 
 
-Model 4: a multivariate regression model showing the difference in employment trends before and after Covid, as well as in the retail industry controlling for sex. 
+Model 4: a multivariate regression model showing the difference in employment trends before and after Covid in the retail industry controlling for sex. 
 
-Model 5: a multivariate regression model showing the difference in employment trends before and after Covid, as well as in the retail industry controlling for age and sex. 
+Model 5: a multivariate regression model showing the difference in employment trends before and after Covid in the retail industry controlling for age and sex. 
 
 Model 6: a multivariate regression model showing the difference in earning trends by age before and after Covid.
 
@@ -171,7 +171,7 @@ plot(model4effect, multiline = TRUE)
 model5effect <- effect('aftercovid*retail', model5, se= TRUE)
 plot(model5effect, multiline = TRUE)
 
-model6youngbinaryeffect <- effect('aftercovid*young', model6youngbinary, se= TRUE)
+model6youngbinaryeffect <- effect('aftercovid*young', model6, se= TRUE)
 plot(model6youngbinaryeffect, multiline = TRUE)
 
 model7effect <- effect('aftercovid*male', model7, se= TRUE)
